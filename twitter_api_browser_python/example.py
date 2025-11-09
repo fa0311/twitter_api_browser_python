@@ -11,8 +11,9 @@ async def main() -> None:
         inject = await browser.inject()
 
         while True:
+            print("=" * 20)
             operation = input(
-                "Choose operation [CreateTweet, HomeTimeline, UserByScreenName, CreateRetweet, FavoriteTweet, SearchTimeline, UsersByRestIds]: "
+                "Choose operation [CreateTweet, HomeTimeline, UserByScreenName, CreateRetweet, FavoriteTweet, SearchTimeline, UsersByRestIds, exit]: "
             )
             if operation == "CreateTweet":
                 res = await inject.request(
@@ -87,7 +88,7 @@ async def main() -> None:
                 )
                 print(res)
             elif operation == "exit":
-                break
+                return
 
 
 if __name__ == "__main__":
