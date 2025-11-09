@@ -1,4 +1,5 @@
 import asyncio
+import json
 from typing import TypeVar
 
 from aiofiles import open
@@ -69,19 +70,27 @@ class TwitterAPIRequest:
         self.init_state = init_state
         self.page = page
 
-    async def graphql(self, method: str, data: dict, path: str):
-        res = await self.page.evaluate(
-            "globalThis.elonmusk_114514_request",
-            {
-                "data": data,
-                "headers": {"content-type": "application/json"},
-                "method": method,
-                "path": path,
-            },
-        )
+    async def graphql(self, method: str, body: dict, path: str):
+        args = {
+            "headers": {"content-type": "application/json"},
+            "method": method,
+            "path": path,
+        }
+        if method == "GET":
+            params = {k: json.dumps(v) for k, v in body.items()}
+            args.update({"params": params})
+        elif method == "POST":
+            args.update({"data": body})
+
+        res = await self.page.evaluate("globalThis.elonmusk_114514_request", args)
         return res
 
-    async def request(self, operation: str, variables: dict):
+    async def request(
+        self,
+        operation: str,
+        variables: dict,
+        fieldToggles: dict[str, bool] = {},
+    ):
         method_map = {
             "query": "GET",
             "mutation": "POST",
@@ -93,27 +102,30 @@ class TwitterAPIRequest:
         queryId: str = exp["queryId"]
         operationType: str = exp["operationType"]
         featureSwitches: list[str] = exp["metadata"]["featureSwitches"]
-        fieldToggles: list[str] = exp["metadata"]["fieldToggles"]
+        allowFieldToggles: list[str] = exp["metadata"]["fieldToggles"]
+        fieldToggles = {k: v for k, v in fieldToggles.items() if k in allowFieldToggles}
 
+        method = method_map[operationType]
         flag = {
             **self.init_state["featureSwitch"]["defaultConfig"],
             **self.init_state["featureSwitch"]["user"],
             **self.init_state["featureSwitch"]["debug"],
             **self.init_state["featureSwitch"]["customOverrides"],
         }
-
         featureSwitchesMap = {
             k: v["value"] for k, v in flag.items() if k in featureSwitches
         }
-
-        data = {
+        body = {
             "variables": variables,
-            "features": featureSwitchesMap,
             "queryId": queryId,
-            # "fieldToggles": fieldToggles,
         }
+        if featureSwitchesMap:
+            body.update({"features": featureSwitchesMap})
+        if fieldToggles:
+            body.update({"fieldToggles": fieldToggles})
+
         return await self.graphql(
-            method=method_map[operationType],
-            data=data,
+            method=method,
+            body=body,
             path=f"/graphql/{queryId}/{operation}",
         )
